@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  app:
+    build: ./app
+    env_file:
+      - ./app/.env
+    volumes:
+      - uploads_data:/app/uploads
+      - results_data:/app/results
+    networks:
+      - service-network
+    depends_on:
+      - database
+      - rabbitmq
+    restart: unless-stopped
+
+  ml_worker:
+    build:
+      context: .
+      dockerfile: ml_worker/Dockerfile
+    env_file:
+      - ./ml_worker/.env
+    volumes:
+      - uploads_data:/app/uploads
+      - results_data:/app/results
+      # Pre-trained model from the notebook (section 8), shared read-only by all workers.
+      - ./model:/app/model:ro
+    networks:
+      - service-network
+    depends_on:
+      - database
+      - rabbitmq
+    restart: unless-stopped
+    # Scale workers with: docker compose up --scale ml_worker=3
+    deploy:
+      replicas: 1
+
+  web-proxy:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./web:/usr/share/nginx/html:ro
+    networks:
+      - service-network
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    hostname: rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+      - RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=-rabbit disk_free_limit 2147483648
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - service-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: on-failure
+
+  database:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - service-network
+    restart: on-failure
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  uploads_data:
+  results_data:
+
+networks:
+  service-network:
+    name: service-network
+    driver: bridge

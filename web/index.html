@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Demand Forecasting — Личный кабинет</title>
+  <style>.hidden { display: none !important; }</style>
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="./config.js"></script>
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="container topbar__inner">
+      <a class="brand" href="#/home">
+        <span class="brand__name">Demand Forecasting</span>
+        <span class="brand__tag">ML-сервис</span>
+      </a>
+      <nav class="nav" id="nav">
+        <a class="nav__link" href="#/home">Главная</a>
+        <a class="nav__link auth-only" href="#/dashboard">Кабинет</a>
+        <a class="nav__link auth-only" href="#/forecast">Прогноз</a>
+        <a class="nav__link auth-only" href="#/history">История</a>
+        <span class="nav__spacer"></span>
+        <a class="nav__link guest-only" href="#/login">Вход</a>
+        <a class="nav__link guest-only" href="#/signup">Регистрация</a>
+        <button class="btn btn--ghost auth-only" id="btnLogout" type="button">Выйти</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div id="globalAlert" class="alert hidden" role="alert"></div>
+
+    <!-- HOME -->
+    <section class="page" id="page-home">
+      <h1>ML-сервис прогнозирования спроса</h1>
+      <p class="muted">Загружайте исторические данные продаж и получайте прогноз на 28 дней.</p>
+      <div class="grid grid--2">
+        <div class="card">
+          <h2>Как это работает</h2>
+          <ol class="list">
+            <li>Зарегистрируйтесь и войдите в кабинет</li>
+            <li>Пополните баланс (кредиты)</li>
+            <li>Загрузите CSV с историческими продажами</li>
+            <li>Запустите прогноз и скачайте результат</li>
+          </ol>
+          <div class="actions">
+            <a class="btn btn--primary guest-only" href="#/login">Войти</a>
+            <a class="btn btn--primary guest-only" href="#/signup">Зарегистрироваться</a>
+            <a class="btn btn--primary auth-only" href="#/forecast">Сделать прогноз</a>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Формат входного CSV</h2>
+          <pre class="code-block">id,date,sales
+ITEM_001,2023-01-01,5
+ITEM_001,2023-01-02,3
+ITEM_002,2023-01-01,12
+...</pre>
+          <p class="muted small">Обязательные колонки: <b>id</b>, <b>date</b>, <b>sales</b><br>
+          Опциональные: sell_price, snap, event_name_1, event_type_1, event_type_2</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- LOGIN -->
+    <section class="page hidden" id="page-login">
+      <h1>Вход</h1>
+      <form class="card form" id="formLogin">
+        <div class="form__group">
+          <label class="form__label" for="loginLogin">Логин</label>
+          <input class="form__input" id="loginLogin" type="text" autocomplete="username" required />
+        </div>
+        <div class="form__group">
+          <label class="form__label" for="loginPassword">Пароль</label>
+          <input class="form__input" id="loginPassword" type="password" autocomplete="current-password" required />
+        </div>
+        <div class="form__actions">
+          <button class="btn btn--primary" type="submit">Войти</button>
+          <a class="btn btn--ghost" href="#/signup">Регистрация</a>
+        </div>
+        <div id="loginError" class="alert hidden"></div>
+      </form>
+    </section>
+
+    <!-- SIGNUP -->
+    <section class="page hidden" id="page-signup">
+      <h1>Регистрация</h1>
+      <form class="card form" id="formSignup">
+        <div class="form__group">
+          <label class="form__label" for="signupLogin">Логин</label>
+          <input class="form__input" id="signupLogin" type="text" autocomplete="username" required />
+        </div>
+        <div class="form__group">
+          <label class="form__label" for="signupEmail">Email</label>
+          <input class="form__input" id="signupEmail" type="email" autocomplete="email" required />
+        </div>
+        <div class="form__group">
+          <label class="form__label" for="signupName">Отображаемое имя</label>
+          <input class="form__input" id="signupName" type="text" required />
+        </div>
+        <div class="form__group">
+          <label class="form__label" for="signupPassword">Пароль</label>
+          <input class="form__input" id="signupPassword" type="password" autocomplete="new-password" required />
+        </div>
+        <div class="form__actions">
+          <button class="btn btn--primary" type="submit">Зарегистрироваться</button>
+          <a class="btn btn--ghost" href="#/login">Войти</a>
+        </div>
+        <div id="signupError" class="alert hidden"></div>
+      </form>
+    </section>
+
+    <!-- DASHBOARD -->
+    <section class="page hidden" id="page-dashboard">
+      <h1>Личный кабинет</h1>
+      <div class="grid grid--2">
+        <div class="card">
+          <h2>Профиль</h2>
+          <p><b>Имя:</b> <span id="dashName">—</span></p>
+          <p><b>Логин:</b> <span id="dashLogin">—</span></p>
+          <p><b>Email:</b> <span id="dashEmail">—</span></p>
+        </div>
+        <div class="card">
+          <h2>Баланс</h2>
+          <p class="balance-value"><span id="dashBalance">—</span> кредитов</p>
+          <form id="formDeposit" class="form">
+            <div class="form__group">
+              <label class="form__label" for="depositAmount">Пополнить на</label>
+              <input class="form__input" id="depositAmount" type="number" min="1" step="1" value="100" />
+            </div>
+            <button class="btn btn--primary" type="submit">Пополнить</button>
+          </form>
+          <div id="depositMsg" class="alert hidden"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FORECAST -->
+    <section class="page hidden" id="page-forecast">
+      <h1>Прогноз спроса</h1>
+      <div class="card form">
+        <h2>Загрузка данных</h2>
+        <p class="muted">CSV-файл должен содержать колонки: <code>id</code>, <code>date</code>, <code>sales</code>.</p>
+        <form id="formUpload">
+          <div class="form__group">
+            <label class="form__label" for="csvFile">Файл с историческими продажами (.csv)</label>
+            <input class="form__input" id="csvFile" type="file" accept=".csv" required />
+          </div>
+          <div class="form__group">
+            <label class="form__label" for="horizon">Горизонт прогноза (дней)</label>
+            <input class="form__input" id="horizon" type="number" min="1" max="365" value="28" />
+          </div>
+          <div class="form__actions">
+            <button class="btn btn--primary" type="submit" id="btnUpload">Загрузить и создать задачу</button>
+          </div>
+          <div id="uploadMsg" class="alert hidden"></div>
+        </form>
+      </div>
+
+      <div class="card hidden" id="jobCard">
+        <h2>Задача прогнозирования</h2>
+        <p><b>ID задачи:</b> <span id="jobId">—</span></p>
+        <p><b>Статус:</b> <span id="jobStatus" class="badge">—</span></p>
+        <p><b>Горизонт:</b> <span id="jobHorizon">—</span> дней</p>
+        <div id="jobResultSection" class="hidden">
+          <hr />
+          <p><b>Рядов в прогнозе:</b> <span id="jobSeries">—</span></p>
+        </div>
+        <div class="form__actions">
+          <button class="btn btn--primary hidden" id="btnProcess" type="button">Запустить прогноз (10 кредитов)</button>
+          <button class="btn btn--secondary hidden" id="btnDownload" type="button">Скачать результат CSV</button>
+          <button class="btn btn--ghost" id="btnPoll" type="button">Обновить статус</button>
+        </div>
+        <div id="jobMsg" class="alert hidden"></div>
+      </div>
+    </section>
+
+    <!-- HISTORY -->
+    <section class="page hidden" id="page-history">
+      <h1>История прогнозов</h1>
+      <div class="card">
+        <table class="table" id="historyTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Статус</th>
+              <th>Горизонт</th>
+              <th>Стоимость</th>
+              <th>Создана</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody">
+            <tr><td colspan="6" class="muted">Загрузка...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</body>
+</html>
